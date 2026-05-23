@@ -23,6 +23,11 @@
         const translations = {
             tw: {
                 'app_title': '樣鞋房雙系統管理帳本 (專業流程版)',
+                'btn_changelog': '更新日誌',
+                'title_changelog': '系統更新日誌',
+                'badge_new': '新增',
+                'badge_fixed': '修復',
+                'badge_improved': '優化',
                 'tab_confirm': '確認鞋 (Confirm)',
                 'tab_fitting': 'FITTING鞋',
                 'view_ledger': '借還流水帳 (完整歷史)',
@@ -96,6 +101,11 @@
             },
             en: {
                 'app_title': 'Sample Room Ledger',
+                'btn_changelog': 'Changelog',
+                'title_changelog': 'System Changelog',
+                'badge_new': 'New',
+                'badge_fixed': 'Fixed',
+                'badge_improved': 'Improved',
                 'tab_confirm': 'Confirm Shoes',
                 'tab_fitting': 'Fitting Shoes',
                 'view_ledger': 'Ledger (Full History)',
@@ -169,6 +179,11 @@
             },
             vn: {
                 'app_title': 'Sổ Quản Lý Phòng Mẫu',
+                'btn_changelog': 'Lịch sử',
+                'title_changelog': 'Lịch sử Cập nhật',
+                'badge_new': 'Mới',
+                'badge_fixed': 'Sửa',
+                'badge_improved': 'Tối ưu',
                 'tab_confirm': 'Giày Confirm',
                 'tab_fitting': 'Giày Fitting',
                 'view_ledger': 'Lịch Sử Mượn/Trả',
@@ -254,6 +269,7 @@
                 }
             });
             window.renderTable();
+            if (document.getElementById('changelogModal') && document.getElementById('changelogModal').classList.contains('active')) { window.renderChangelog(); }
         };
 
         window.t = function(key, params = {}) {
@@ -280,6 +296,7 @@
             });
             updateTabStyles();
             window.renderTable();
+            if (document.getElementById('changelogModal') && document.getElementById('changelogModal').classList.contains('active')) { window.renderChangelog(); }
         };
 
 
@@ -443,6 +460,7 @@
             window.selectedIds.clear();
             updateTabStyles();
             window.renderTable();
+            if (document.getElementById('changelogModal') && document.getElementById('changelogModal').classList.contains('active')) { window.renderChangelog(); }
         };
 
         window.switchView = function(view) {
@@ -450,6 +468,7 @@
             window.selectedIds.clear();
             updateTabStyles();
             window.renderTable();
+            if (document.getElementById('changelogModal') && document.getElementById('changelogModal').classList.contains('active')) { window.renderChangelog(); }
         };
 
         function updateTabStyles() {
@@ -473,6 +492,7 @@
             if (window.selectedIds.has(id)) window.selectedIds.delete(id);
             else window.selectedIds.add(id);
             window.renderTable();
+            if (document.getElementById('changelogModal') && document.getElementById('changelogModal').classList.contains('active')) { window.renderChangelog(); }
         };
 
         window.toggleSelectAll = function(checked) {
@@ -484,6 +504,7 @@
                 }
             });
             window.renderTable();
+            if (document.getElementById('changelogModal') && document.getElementById('changelogModal').classList.contains('active')) { window.renderChangelog(); }
         };
 
         function getFilteredItems() {
@@ -905,6 +926,82 @@
             link.setAttribute("download", `${window.currentMode}_ledger.csv`); link.click();
         };
 
+        
+        const changelogData = [
+            {
+                version: "v1.2",
+                date: "2026-05-23",
+                items: [
+                    { type: 'improved', text_tw: '精確數量管理：將計算單位全面改為「隻」，並支援 0.5 等小數點單位輸入，解決單腳樣鞋盤點誤差問題。', text_en: 'Quantity Management: Changed unit to "pcs" and supported decimal inputs (e.g. 0.5) for better single-shoe tracking.', text_vn: 'Quản lý số lượng: Thay đổi đơn vị thành "chiếc" và hỗ trợ nhập số thập phân (VD: 0.5) để theo dõi giày chiếc lẻ tốt hơn.' },
+                    { type: 'new', text_tw: '新增系統更新日誌面板，歷史紀錄一目了然。', text_en: 'Added System Changelog modal to track historical updates.', text_vn: 'Thêm bảng Lịch sử Cập nhật Hệ thống để theo dõi các thay đổi.' }
+                ]
+            },
+            {
+                version: "v1.1",
+                date: "2026-05-23",
+                items: [
+                    { type: 'new', text_tw: '多國語系引擎：加入中、英、越即時切換功能，消除跨國溝通障礙。', text_en: 'I18n Engine: Added instant switching between TW, EN, and VN languages.', text_vn: 'Đa ngôn ngữ: Thêm tính năng chuyển đổi tức thời giữa tiếng Trung, Anh và Việt.' },
+                    { type: 'new', text_tw: 'Premium UI 視覺升級：導入靛藍色企業級色調、毛玻璃凍結表頭、右下角滑出式 Toast 提示卡片。', text_en: 'Premium UI Upgrade: Indigo color palette, glassmorphism sticky headers, and Toast notifications.', text_vn: 'Nâng cấp giao diện cao cấp: Bảng màu Indigo, tiêu đề cố định hiệu ứng kính, và thông báo Toast.' },
+                    { type: 'new', text_tw: '防呆警示機制：借出超過 10 天未還紀錄，系統會自動標紅並顯示「⚠️ 逾期未還」。', text_en: 'Overdue Warning: Records overdue for > 10 days are highlighted in red.', text_vn: 'Cảnh báo quá hạn: Các bản ghi chưa trả quá 10 ngày sẽ được tô màu đỏ.' },
+                    { type: 'improved', text_tw: '自動完成記憶：輸入品牌與型號時，點擊即可帶出歷史輸入過的選項，減少錯字。', text_en: 'Auto-complete: Brand and Style inputs now remember past entries to prevent typos.', text_vn: 'Tự động điền: Ô nhập Thương hiệu và Kiểu dáng giờ đây ghi nhớ các mục đã nhập để tránh lỗi chính tả.' }
+                ]
+            },
+            {
+                version: "v1.0",
+                date: "2026-05-22",
+                items: [
+                    { type: 'new', text_tw: '基礎雙系統上線：確認鞋與 FITTING 鞋獨立標籤，具備借還流水帳與在庫現況。', text_en: 'Base System Launch: Separate Confirm and Fitting shoe tracking with ledger and inventory views.', text_vn: 'Ra mắt hệ thống cơ bản: Theo dõi riêng biệt giày Xác nhận và giày Fitting với các chế độ xem sổ cái và tồn kho.' }
+                ]
+            }
+        ];
+
+        window.renderChangelog = function() {
+            const container = document.getElementById('changelogContent');
+            if (!container) return;
+            
+            const typeColors = {
+                'new': 'bg-emerald-100 text-emerald-700',
+                'fixed': 'bg-red-100 text-red-700',
+                'improved': 'bg-indigo-100 text-indigo-700'
+            };
+            const typeLabels = {
+                'new': window.t('badge_new') || 'New',
+                'fixed': window.t('badge_fixed') || 'Fixed',
+                'improved': window.t('badge_improved') || 'Improved'
+            };
+
+            let chtml = '';
+            changelogData.forEach(release => {
+                chtml += `
+                    <div class="relative border-l-2 border-slate-200 pl-6 pb-6 last:pb-0">
+                        <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-indigo-500 ring-4 ring-slate-50"></div>
+                        <div class="flex items-baseline gap-3 mb-3">
+                            <h3 class="font-black text-lg text-slate-800">${release.version}</h3>
+                            <span class="text-xs text-slate-400 font-bold">${release.date}</span>
+                        </div>
+                        <div class="space-y-3">
+                `;
+                
+                release.items.forEach(item => {
+                    const text = item[`text_${window.currentLang}`] || item.text_tw;
+                    chtml += `
+                        <div class="flex items-start gap-3 bg-white p-3 rounded-lg shadow-sm border border-slate-100">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${typeColors[item.type]}">${typeLabels[item.type]}</span>
+                            <p class="text-xs text-slate-600 leading-relaxed font-bold">${text}</p>
+                        </div>
+                    `;
+                });
+
+                chtml += `</div></div>`;
+            });
+            container.innerHTML = chtml;
+            
+            // Re-initialize lucide icons for the new HTML
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        };
+
         function getMD() { const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()}`; }
         initApp();
     </script>
@@ -954,7 +1051,11 @@
                 <button id="tabFitting" onclick="switchMode('fitting')" class="px-4 py-2 rounded-lg font-bold text-sm bg-slate-200 text-slate-500 transition-all" data-i18n="tab_fitting">FITTING鞋</button>
             </div>
             <div id="statPanel" class="flex gap-4 text-[10px] font-black bg-white px-4 py-2 rounded-xl border shadow-sm uppercase tracking-tighter">
-                <select id="langSwitcher" onchange="window.setLanguage(this.value)" class="bg-transparent outline-none cursor-pointer text-slate-500 font-bold border-r pr-2 border-slate-200">
+                <button onclick="openModal('changelogModal'); window.renderChangelog();" class="flex items-center gap-1 text-slate-500 hover:text-indigo-600 font-bold border-r pr-2 mr-2 border-slate-200 transition-colors">
+                    <i data-lucide="bell-ring" class="w-4 h-4"></i>
+                    <span data-i18n="btn_changelog">更新日誌</span>
+                </button>
+                <select id="langSwitcher"  onchange="window.setLanguage(this.value)" class="bg-transparent outline-none cursor-pointer text-slate-500 font-bold border-r pr-2 border-slate-200">
                     <option value="tw">繁中 (TW)</option>
                     <option value="en">English (EN)</option>
                     <option value="vn">Tiếng Việt (VN)</option>
