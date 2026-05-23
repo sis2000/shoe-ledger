@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="app_title">樣鞋房雙系統管理帳本 (專業流程版)</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Noto+Sans+TC:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, addDoc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 儲存模式切換 ---
+        // 將此變數設為 false 就能恢復 Firebase 雲端連線
+        window.USE_LOCAL_STORAGE = false;
+
+        window.currentLang = 'tw';
+        
+        const translations = {
+            tw: {
+                'app_title': '樣鞋房雙系統管理帳本 (專業流程版)',
+                'tab_confirm': '確認鞋 (Confirm)',
+                'tab_fitting': 'FITTING鞋',
+                'view_ledger': '借還流水帳 (完整歷史)',
+                'view_inventory': '樣鞋房在庫現況 (現有實體)',
+                'btn_bulk_return': '批量歸還 ({n}筆)',
+                'btn_export': '匯出報表',
+                'btn_import': '匯入資料',
+                'btn_add_inventory': '新增在庫樣鞋',
+                'btn_add_loan': '新增借出紀錄',
+                'th_status': '當前狀態',
+                'th_brand': 'Brand',
+                'th_style': 'Style #',
+                'th_color': 'Color',
+                'th_season': 'Season',
+                'th_loan_date': '借出日期',
+                'th_qty_days': '數量/天數',
+                'th_borrower': '借用人',
+                'th_return_date': '歸還日期',
+                'th_signature': '簽收紀錄',
+                'th_action': '操作',
+                'filter_all': '全部',
+                'filter_lent': '外借中',
+                'filter_closed': '已結案',
+                'ph_search_style': '搜尋型號',
+                'ph_search_color': '搜尋顏色',
+                'ph_search_borrower': '搜尋借用人',
+                'form_tab_loan': '再次借出 / 新增',
+                'form_tab_return': '歸還簽收',
+                'ph_brand': '品牌 Brand',
+                'ph_style': '型號 Style #',
+                'ph_color': '顏色 Colorway',
+                'ph_season': '季節 Season',
+                'lbl_qty': '操作數量 (隻)',
+                'lbl_borrower': '借用人 / 單位',
+                'ph_borrower': '請輸入借用人姓名 (如: 針車課 王大明)',
+                'btn_confirm_in': '確認入庫上架',
+                'btn_confirm_out': '確認直接借出 (寫入流水)',
+                'msg_returned': '該筆歷史紀錄已歸還完畢',
+                'lbl_r_borrower': '借用人:',
+                'lbl_r_date': '借出日:',
+                'ph_r_date': '實際歸還日期 (M/D)',
+                'btn_confirm_return': '確認簽收結案',
+                'val_assistant': '助理已收',
+                'badge_in_stock': '在庫 {av} / 總量 {tot}',
+                'badge_lent': '外借中',
+                'badge_closed': '已結案',
+                'badge_overdue': '⚠️ 逾期未還',
+                'txt_pair': '隻',
+                'txt_day': '天',
+                'txt_pending': '待收',
+                'txt_sign': '簽:',
+                'title_confirm_del': '確定要刪除記錄嗎？',
+                'btn_cancel': '取消',
+                'btn_del': '確定刪除',
+                'empty_state': '目前此視圖下尚無資料',
+                
+                'toast_add_success': '✅ 成功新增紀錄',
+                'toast_return_success': '✅ 成功歸還簽收',
+                'toast_del_success': '🗑️ 紀錄已刪除',
+                'toast_import_success': '✅ 成功匯入 {n} 筆資料',
+                'dash_total': '總在庫數量',
+                'dash_lent': '目前外借中',
+                'dash_overdue': '逾期未還',
+                'modal_bulk': '批量歸還簽收',
+                'btn_bulk_confirm': '確認批量收回結案',
+                'modal_import': '匯入 CSV 歷史資料',
+                'btn_import_file': '點擊選擇檔案',
+                'msg_syncing': '雲端同步中',
+                'msg_local': '單機模式 (LocalStorage)',
+                'msg_conn_fail': '連線失敗'
+            },
+            en: {
+                'app_title': 'Sample Room Ledger',
+                'tab_confirm': 'Confirm Shoes',
+                'tab_fitting': 'Fitting Shoes',
+                'view_ledger': 'Ledger (Full History)',
+                'view_inventory': 'Inventory (Current Stock)',
+                'btn_bulk_return': 'Bulk Return ({n})',
+                'btn_export': 'Export',
+                'btn_import': 'Import',
+                'btn_add_inventory': 'Add Inventory',
+                'btn_add_loan': 'Add Loan Record',
+                'th_status': 'Status',
+                'th_brand': 'Brand',
+                'th_style': 'Style #',
+                'th_color': 'Color',
+                'th_season': 'Season',
+                'th_loan_date': 'Loan Date',
+                'th_qty_days': 'Qty/Days',
+                'th_borrower': 'Borrower',
+                'th_return_date': 'Return Date',
+                'th_signature': 'Signature',
+                'th_action': 'Action',
+                'filter_all': 'All',
+                'filter_lent': 'Lent Out',
+                'filter_closed': 'Closed',
+                'ph_search_style': 'Search Style',
+                'ph_search_color': 'Search Color',
+                'ph_search_borrower': 'Search Borrower',
+                'form_tab_loan': 'Loan / Add',
+                'form_tab_return': 'Return',
+                'ph_brand': 'Brand',
+                'ph_style': 'Style #',
+                'ph_color': 'Colorway',
+                'ph_season': 'Season',
+                'lbl_qty': 'Qty (Pcs)',
+                'lbl_borrower': 'Borrower / Dept',
+                'ph_borrower': 'Enter borrower name',
+                'btn_confirm_in': 'Confirm Add to Stock',
+                'btn_confirm_out': 'Confirm Loan',
+                'msg_returned': 'This record is already returned.',
+                'lbl_r_borrower': 'Borrower:',
+                'lbl_r_date': 'Loan Date:',
+                'ph_r_date': 'Return Date (M/D)',
+                'btn_confirm_return': 'Confirm Return',
+                'val_assistant': 'Received by Ast.',
+                'badge_in_stock': 'Stock {av} / Total {tot}',
+                'badge_lent': 'Lent Out',
+                'badge_closed': 'Closed',
+                'badge_overdue': '⚠️ Overdue',
+                'txt_pair': 'pcs',
+                'txt_day': 'days',
+                'txt_pending': 'Pending',
+                'txt_sign': 'Sign:',
+                'title_confirm_del': 'Are you sure you want to delete?',
+                'btn_cancel': 'Cancel',
+                'btn_del': 'Delete',
+                'empty_state': 'No data in this view',
+                
+                'toast_add_success': '✅ Record Added',
+                'toast_return_success': '✅ Successfully Returned',
+                'toast_del_success': '🗑️ Record Deleted',
+                'toast_import_success': '✅ Imported {n} records',
+                'dash_total': 'Total Stock',
+                'dash_lent': 'Currently Lent',
+                'dash_overdue': 'Overdue',
+                'modal_bulk': 'Bulk Return',
+                'btn_bulk_confirm': 'Confirm Bulk Return',
+                'modal_import': 'Import CSV Data',
+                'btn_import_file': 'Click to Select File',
+                'msg_syncing': 'Cloud Syncing',
+                'msg_local': 'Local Mode',
+                'msg_conn_fail': 'Connection Failed'
+            },
+            vn: {
+                'app_title': 'Sổ Quản Lý Phòng Mẫu',
+                'tab_confirm': 'Giày Confirm',
+                'tab_fitting': 'Giày Fitting',
+                'view_ledger': 'Lịch Sử Mượn/Trả',
+                'view_inventory': 'Tồn Kho (Hiện Tại)',
+                'btn_bulk_return': 'Trả Hàng Loạt ({n})',
+                'btn_export': 'Xuất File',
+                'btn_import': 'Nhập File',
+                'btn_add_inventory': 'Thêm Tồn Kho',
+                'btn_add_loan': 'Thêm Lịch Sử Mượn',
+                'th_status': 'Trạng Thái',
+                'th_brand': 'Brand',
+                'th_style': 'Style #',
+                'th_color': 'Color',
+                'th_season': 'Season',
+                'th_loan_date': 'Ngày Mượn',
+                'th_qty_days': 'SL/Ngày',
+                'th_borrower': 'Người Mượn',
+                'th_return_date': 'Ngày Trả',
+                'th_signature': 'Ký Nhận',
+                'th_action': 'Thao Tác',
+                'filter_all': 'Tất cả',
+                'filter_lent': 'Đang Mượn',
+                'filter_closed': 'Đã Trả',
+                'ph_search_style': 'Tìm Style',
+                'ph_search_color': 'Tìm Color',
+                'ph_search_borrower': 'Tìm Người Mượn',
+                'form_tab_loan': 'Mượn / Thêm',
+                'form_tab_return': 'Trả Lại',
+                'ph_brand': 'Brand',
+                'ph_style': 'Style #',
+                'ph_color': 'Colorway',
+                'ph_season': 'Season',
+                'lbl_qty': 'Số Lượng',
+                'lbl_borrower': 'Người Mượn / Bộ Phận',
+                'ph_borrower': 'Nhập tên người mượn',
+                'btn_confirm_in': 'Xác Nhận Nhập Kho',
+                'btn_confirm_out': 'Xác Nhận Cho Mượn',
+                'msg_returned': 'Đơn này đã được trả lại.',
+                'lbl_r_borrower': 'Người Mượn:',
+                'lbl_r_date': 'Ngày Mượn:',
+                'ph_r_date': 'Ngày Trả (M/D)',
+                'btn_confirm_return': 'Xác Nhận Trả Lại',
+                'val_assistant': 'Trợ lý đã nhận',
+                'badge_in_stock': 'Tồn {av} / Tổng {tot}',
+                'badge_lent': 'Đang Mượn',
+                'badge_closed': 'Đã Trả',
+                'badge_overdue': '⚠️ Quá Hạn',
+                'txt_pair': 'chiếc',
+                'txt_day': 'ngày',
+                'txt_pending': 'Chưa trả',
+                'txt_sign': 'Ký:',
+                'title_confirm_del': 'Bạn có chắc chắn muốn xóa?',
+                'btn_cancel': 'Hủy',
+                'btn_del': 'Xóa',
+                'empty_state': 'Không có dữ liệu',
+                
+                'toast_add_success': '✅ Đã thêm bản ghi',
+                'toast_return_success': '✅ Đã trả lại thành công',
+                'toast_del_success': '🗑️ Đã xóa bản ghi',
+                'toast_import_success': '✅ Đã nhập {n} bản ghi',
+                'dash_total': 'Tổng Tồn Kho',
+                'dash_lent': 'Đang Cho Mượn',
+                'dash_overdue': 'Quá Hạn',
+                'modal_bulk': 'Trả Hàng Loạt',
+                'btn_bulk_confirm': 'Xác Nhận Trả Hàng Loạt',
+                'modal_import': 'Nhập Dữ Liệu CSV',
+                'btn_import_file': 'Nhấp Chọn File',
+                'msg_syncing': 'Đang Đồng Bộ',
+                'msg_local': 'Chế Độ Nội Bộ',
+                'msg_conn_fail': 'Lỗi Kết Nối'
+            }
+        };
+
+        window.t = function(key, params = {}) {
+            let str = translations[window.currentLang]?.[key] || translations['tw'][key] || key;
+            Object.keys(params).forEach(k => {
+                str = str.replace(`{${k}}`, params[k]);
+            });
+            return str;
+        };
+
+        window.changeLang = function(lang) {
+            window.currentLang = lang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (el.tagName === 'INPUT' && el.hasAttribute('placeholder')) {
+                    el.placeholder = window.t(key);
+                } else if (el.tagName === 'INPUT' && el.type === 'button') {
+                    el.value = window.t(key);
+                } else if (el.tagName === 'SELECT' && el.classList.contains('filter-select') && el.options.length > 0 && el.options[0].value === "") {
+                     el.options[0].text = window.t(key);
+                } else {
+                    el.innerText = window.t(key);
+                }
+            });
+            updateTabStyles();
+            window.renderTable();
+        };
+
+
+        // --- Firebase 設定區 ---
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyBEzPT-gedfUMnwSiSuVY4aXuNNqWHxilA",
+            authDomain: "shoe-factory-ledger.firebaseapp.com",
+            projectId: "shoe-factory-ledger",
+            storageBucket: "shoe-factory-ledger.firebasestorage.app",
+            messagingSenderId: "380748962069",
+            appId: "1:380748962069:web:bb37fe839b5cdf3c86b11c"
+        };
+
+        const isCanvas = typeof __firebase_config !== 'undefined' && __firebase_config !== "";
+        const firebaseConfig = isCanvas ? JSON.parse(__firebase_config) : myFirebaseConfig;
+        const logicAppId = (typeof __app_id !== 'undefined' && __app_id) ? __app_id : 'shoe-factory-manager-ledger';
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // 全域變數
+        window.dataStore = { confirm: [], fitting: [] };
+        window.currentMode = 'confirm'; 
+        window.viewType = 'ledger'; 
+        window.isAuthReady = false;
+        window.selectedIds = new Set(); 
+        let filters = {};
+        let currentRecord = null;
+        let isSyncing = false;
+
+        function refreshIcons() {
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        }
+
+        async function initApp() {
+            const syncIndicator = document.getElementById('syncIndicator');
+            const syncText = document.getElementById('syncText');
+
+            if (window.USE_LOCAL_STORAGE) {
+                window.isAuthReady = true;
+                if (syncIndicator) syncIndicator.className = "flex items-center gap-1 text-indigo-500 font-bold";
+                if (syncText) syncText.innerText = window.t("msg_local");
+                
+                // 載入本機資料
+                const c = localStorage.getItem('shoe_ledger_confirm');
+                const f = localStorage.getItem('shoe_ledger_fitting');
+                window.dataStore.confirm = c ? JSON.parse(c) : [];
+                window.dataStore.fitting = f ? JSON.parse(f) : [];
+                window.renderTable();
+                refreshIcons();
+                return;
+            }
+
+            try {
+                if (isCanvas && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        window.isAuthReady = true;
+                        if (!isSyncing) {
+                            startSyncing();
+                            isSyncing = true;
+                        }
+                    }
+                });
+                refreshIcons();
+            } catch (err) {
+                console.error("Auth Error:", err);
+                if (syncText) syncText.innerText = window.t("msg_conn_fail");
+            }
+        }
+
+        function startSyncing() {
+            const syncIndicator = document.getElementById('syncIndicator');
+            const syncText = document.getElementById('syncText');
+            const getColl = (mode) => collection(db, 'artifacts', logicAppId, 'public', 'data', `${mode}_ledger`);
+
+            const handleUpdate = (mode, snapshot) => {
+                window.dataStore[mode] = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+                if (syncIndicator) {
+                    syncIndicator.className = "flex items-center gap-1 text-emerald-500 font-bold";
+                    syncText.innerText = window.t("msg_syncing");
+                }
+                window.renderTable();
+            };
+            onSnapshot(getColl('confirm'), (s) => handleUpdate('confirm', s));
+            onSnapshot(getColl('fitting'), (s) => handleUpdate('fitting', s));
+        }
+
+        function saveLocal() {
+            localStorage.setItem('shoe_ledger_confirm', JSON.stringify(window.dataStore.confirm));
+            localStorage.setItem('shoe_ledger_fitting', JSON.stringify(window.dataStore.fitting));
+            window.renderTable();
+        }
+
+        window.dbActions = {
+            async add(data) {
+                if (!window.isAuthReady) return;
+                if (window.USE_LOCAL_STORAGE) {
+                    const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                    window.dataStore[window.currentMode].push({ ...data, id });
+                    saveLocal();
+                } else {
+                    await addDoc(collection(db, 'artifacts', logicAppId, 'public', 'data', `${window.currentMode}_ledger`), data);
+                }
+            },
+            async update(id, updates) {
+                if (!window.isAuthReady) return;
+                if (window.USE_LOCAL_STORAGE) {
+                    const idx = window.dataStore[window.currentMode].findIndex(r => r.id === id);
+                    if (idx !== -1) {
+                        window.dataStore[window.currentMode][idx] = { ...window.dataStore[window.currentMode][idx], ...updates };
+                        saveLocal();
+                    }
+                } else {
+                    await updateDoc(doc(db, 'artifacts', logicAppId, 'public', 'data', `${window.currentMode}_ledger`, id), updates);
+                }
+            },
+            async delete(id) {
+                if (!window.isAuthReady) return;
+                if (window.USE_LOCAL_STORAGE) {
+                    window.dataStore[window.currentMode] = window.dataStore[window.currentMode].filter(r => r.id !== id);
+                    saveLocal();
+                } else {
+                    await deleteDoc(doc(db, 'artifacts', logicAppId, 'public', 'data', `${window.currentMode}_ledger`, id));
+                }
+            }
+        };
+
+        
+        window.showToast = function(msg) {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = 'bg-slate-800 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transform transition-all duration-300 translate-y-4 opacity-0 font-bold tracking-wide text-sm';
+            toast.innerHTML = msg;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-4', 'opacity-0');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-4', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+        
+        window.openActionModalById = function(id) {
+            const items = window.dataStore[window.currentMode] || [];
+            const record = items.find(i => i.id === id);
+            if (record) window.openActionModal(record);
+        };
+
+        window.switchMode = function(mode) {
+            window.currentMode = mode;
+            window.selectedIds.clear();
+            updateTabStyles();
+            window.renderTable();
+        };
+
+        window.switchView = function(view) {
+            window.viewType = view;
+            window.selectedIds.clear();
+            updateTabStyles();
+            window.renderTable();
+        };
+
+        function updateTabStyles() {
+            document.body.classList.toggle('mode-inventory', window.viewType === 'inventory');
+            
+            document.getElementById('tabConfirm').className = (window.currentMode === 'confirm') ? 'px-4 py-2 rounded-lg font-bold text-sm bg-indigo-600 text-white shadow-md transition-all' : 'px-4 py-2 rounded-lg font-bold text-sm bg-slate-200 text-slate-500 transition-all';
+            document.getElementById('tabFitting').className = (window.currentMode === 'fitting') ? 'px-4 py-2 rounded-lg font-bold text-sm bg-orange-500 text-white shadow-md transition-all' : 'px-4 py-2 rounded-lg font-bold text-sm bg-slate-200 text-slate-500 transition-all';
+            document.getElementById('viewLedger').className = (window.viewType === 'ledger') ? 'px-6 py-2 rounded-t-lg font-black text-sm bg-white border-b-2 border-indigo-600 text-indigo-600 transition-all' : 'px-6 py-2 rounded-t-lg font-bold text-sm bg-slate-100 text-slate-400 transition-all';
+            document.getElementById('viewInventory').className = (window.viewType === 'inventory') ? 'px-6 py-2 rounded-t-lg font-black text-sm bg-white border-b-2 border-emerald-600 text-emerald-600 transition-all' : 'px-6 py-2 rounded-t-lg font-bold text-sm bg-slate-100 text-slate-400 transition-all';
+            
+                        document.getElementById('addBtnText').innerText = window.viewType === 'inventory' ? window.t('btn_add_inventory') : window.t('btn_add_loan');
+            
+            const title = document.getElementById('titleDisplay');
+            const icon = window.viewType === 'ledger' ? 'layout-list' : 'package-search';
+                        const text = `${window.currentMode === 'confirm' ? window.t('tab_confirm') : window.t('tab_fitting')} ${window.viewType === 'ledger' ? window.t('view_ledger') : window.t('view_inventory')}`;
+            title.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i> ${text}`;
+            refreshIcons();
+        }
+
+        window.toggleRowSelection = function(id) {
+            if (window.selectedIds.has(id)) window.selectedIds.delete(id);
+            else window.selectedIds.add(id);
+            window.renderTable();
+        };
+
+        window.toggleSelectAll = function(checked) {
+            const items = getFilteredItems();
+            items.forEach(r => {
+                if (!r.returnDate || r.returnDate.trim() === '') {
+                    if (checked) window.selectedIds.add(r.id);
+                    else window.selectedIds.delete(r.id);
+                }
+            });
+            window.renderTable();
+        };
+
+        function getFilteredItems() {
+            const items = window.dataStore[window.currentMode] || [];
+            let displayItems = items;
+
+            if (window.viewType === 'inventory') {
+                const aggMap = new Map();
+                items.forEach(item => {
+                    const key = `${item.brand}_${item.style}_${item.color}`.toLowerCase();
+                    if (!aggMap.has(key)) {
+                        aggMap.set(key, { ...item, totalQty: 0, outQty: 0, isAggregated: true });
+                    }
+                    const qStr = item.qty;
+                    const q = (qStr !== undefined && qStr !== '') ? parseFloat(qStr) : 1;
+                    const mapItem = aggMap.get(key);
+                    
+                    if (!item.borrower || item.borrower.trim() === '') {
+                        mapItem.totalQty += q;
+                    } else {
+                        if (!item.returnDate || item.returnDate.trim() === '') {
+                            mapItem.outQty += q;
+                        }
+                    }
+                });
+                
+                displayItems = Array.from(aggMap.values()).map(i => {
+                    // 如果已知總量小於目前借出的數量，代表之前有「直接借出但未入庫」的狀況。
+                    // 這裡自動校正，保證可用數量最低為 0。
+                    i.totalQty = Math.max(i.totalQty, i.outQty);
+                    i.availableQty = i.totalQty - i.outQty;
+                    i.inventoryStatus = window.t("badge_in_stock", {av: i.availableQty, tot: i.totalQty});
+                    return i;
+                });
+            } else {
+                // --- 核心改動：流水帳視圖過濾掉純入庫紀錄 (沒有借用人的紀錄) ---
+                displayItems = [...items]
+                    .filter(i => i.borrower && i.borrower !== '')
+                    .sort((a, b) => parseInt(b.stt) - parseInt(a.stt));
+            }
+
+            return displayItems.filter(r => {
+                const statusStr = (!r.returnDate || r.returnDate.trim() === '') ? window.t('badge_lent') : window.t('badge_closed');
+                const combinedBorrower = [r.dept, r.borrower].filter(Boolean).join(' ');
+                const row = [r.stt, statusStr, r.brand, r.style, r.color, r.season, r.loanDate, r.expected, combinedBorrower, '', r.returnDate];
+                return Object.keys(filters).every(k => !filters[k] || row[k]?.toString().toLowerCase().includes(filters[k]));
+            });
+        }
+
+        window.renderTable = function() {
+            const body = document.getElementById('ledgerBody');
+            if (!body) return;
+            body.innerHTML = '';
+            const filtered = getFilteredItems();
+            const bulkBtn = document.getElementById('bulkReturnBtn');
+            const selectHeader = document.getElementById('selectHeader');
+            const filterSelect = document.getElementById('filterSelect');
+            
+            if (selectHeader) selectHeader.style.display = window.viewType === 'inventory' ? 'none' : 'table-cell';
+            if (filterSelect) filterSelect.style.display = window.viewType === 'inventory' ? 'none' : 'table-cell';
+
+            if (window.selectedIds.size > 0 && window.viewType === 'ledger') {
+                bulkBtn.classList.remove('hidden');
+                bulkBtn.innerText = window.t('btn_bulk_return', {n: window.selectedIds.size});
+            } else { bulkBtn.classList.add('hidden'); }
+
+            const fill = (id, list) => {
+                const s = document.getElementById(id); if (!s) return;
+                const cur = s.value;
+                s.innerHTML = '<option value="" data-i18n="filter_all">全部</option>';
+                [...new Set(list)].filter(Boolean).sort().forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v; opt.innerText = v; s.appendChild(opt);
+                });
+                s.value = cur;
+            };
+            const allItems = window.dataStore[window.currentMode] || [];
+            fill('f_brand', allItems.map(i => i.brand));
+            fill('f_season', allItems.map(i => i.season));
+
+            
+            // Dashboard calculations
+            let totalStock = 0;
+            let totalLent = 0;
+            let totalOverdue = 0;
+            const nowTime = Date.now();
+            
+            const aggMap = new Map();
+            allItems.forEach(item => {
+                const key = `${item.brand}_${item.style}_${item.color}`.toLowerCase();
+                if (!aggMap.has(key)) aggMap.set(key, { ...item, totalQty: 0, outQty: 0 });
+                const mapItem = aggMap.get(key);
+                const q = item.qty !== undefined && item.qty !== '' ? parseFloat(item.qty) : 1;
+                
+                if (!item.borrower || item.borrower.trim() === '') {
+                    mapItem.totalQty += q;
+                } else if (!item.returnDate || item.returnDate.trim() === '') {
+                    mapItem.outQty += q;
+                    totalLent += q;
+                    
+                    const p = item.loanDate.split('/');
+                    if (p.length === 2) {
+                        const lDate = new Date(new Date().getFullYear(), parseInt(p[0])-1, parseInt(p[1]));
+                        if ((nowTime - lDate.getTime()) / (1000 * 3600 * 24) > 10) {
+                            totalOverdue += q;
+                            item._isOverdue = true;
+                        }
+                    }
+                }
+            });
+            Array.from(aggMap.values()).forEach(i => {
+                totalStock += (Math.max(i.totalQty, i.outQty) - i.outQty);
+            });
+            
+            document.getElementById('dashValTotal').innerText = totalStock;
+            document.getElementById('dashValLent').innerText = totalLent;
+            document.getElementById('dashValOverdue').innerText = totalOverdue;
+            
+            filtered.forEach(r => {
+                const isLent = !r.returnDate || r.returnDate.trim() === '';
+                const isSelected = window.selectedIds.has(r.id);
+                const tr = document.createElement('tr');
+                tr.className = `cursor-pointer border-b border-slate-100 transition-all hover:bg-slate-50 ${isSelected ? 'bg-blue-50' : ''}`;
+                
+                if (window.viewType === 'ledger') {
+                    tr.onclick = (e) => { if (isLent && e.target.type !== 'checkbox' && !e.target.closest('button')) { window.toggleRowSelection(r.id); } };
+                    tr.ondblclick = () => window.openActionModal(r);
+                }
+
+                let statusBadge = '';
+                if (window.viewType === 'inventory') {
+                    const isWarning = r.availableQty < 0;
+                    const isZero = r.availableQty === 0;
+                    const badgeClass = isWarning ? 'bg-red-100 text-red-700' : (isZero ? 'bg-slate-200 text-slate-500' : 'bg-emerald-100 text-emerald-700');
+                    statusBadge = `<span class="text-[10px] ${badgeClass} px-1.5 py-0.5 rounded font-bold whitespace-nowrap">${r.inventoryStatus}</span>`;
+                } else {
+                    const qStr = (parseFloat(r.qty) || 1) !== 1 ? ` (${r.qty} ${window.t("txt_pair")})` : '';
+                    statusBadge = isLent ? 
+                        `<span class="text-[9px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">${window.t("badge_lent")}${qStr}</span>` : 
+                        `<span class="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">${window.t("badge_closed")}${qStr}</span>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="p-2 text-center" style="${window.viewType === 'inventory' ? 'display:none' : ''}">
+                        ${isLent ? `<input type="checkbox" class="w-4 h-4 rounded accent-indigo-600" ${isSelected ? 'checked' : ''} onchange="window.toggleRowSelection('${r.id}')">` : ''}
+                    </td>
+                    <td class="p-2 text-slate-400 font-mono text-[10px] ledger-col">${r.stt}</td>
+                    <td class="p-2">${statusBadge}</td>
+                    <td class="p-2 font-bold text-slate-700">${r.brand || ''}</td>
+                    <td class="p-2 font-mono text-indigo-600 font-bold">${r.style || ''}</td>
+                    <td class="p-2 text-slate-500">${r.color || ''}</td>
+                    <td class="p-2 text-slate-400 uppercase text-[10px]">${r.season || ''}</td>
+                    <td class="p-2 text-slate-400 font-mono ledger-col">${r.loanDate || ''}</td>
+                    <td class="p-2 text-center text-slate-500 font-bold ledger-col"><span class="text-indigo-600">${r.qty || 1} ${window.t('txt_pair')}</span> / ${r.expected || ''} ${window.t('txt_day')}</td>
+                    <td class="p-2 font-bold text-slate-700 ledger-col">${r.dept ? `<span class="text-[9px] text-slate-400 block">${r.dept}</span>` : ''}${r.borrower || ''}</td>
+                    <td class="p-2 text-green-600 font-black ledger-col">${r.returnDate || '--'}</td>
+                    <td class="p-2 text-[10px] text-slate-400 ledger-col">${r.returnDate ? `${r.returnedBy}<br><span class="opacity-50 text-[9px]">簽:${r.confirmerReturn}</span>` : window.t('txt_pending')}</td>
+                    <td class="p-2 text-center">
+                        <div class="flex justify-center gap-2">
+                            ${window.viewType === 'inventory' ? `
+                            <button onclick="event.stopPropagation(); window.adjustInventory('${r.brand}', '${r.style}', '${r.color || ''}', '${r.season || ''}', ${r.totalQty})" class="text-amber-500 hover:scale-110 transition-all" title="校正庫存總量">
+                                <i data-lucide="edit-3" class="w-5 h-5"></i>
+                            </button>
+                            ` : `
+                            <button onclick="event.stopPropagation(); window.openActionModalById('${r.id}')" class="${isLent ? 'text-indigo-500' : 'text-slate-400'} hover:scale-110 transition-all" title="${isLent ? '歸還簽收' : '檢視'}">
+                                <i data-lucide="${isLent ? 'check-square' : 'copy'}" class="w-5 h-5"></i>
+                            </button>
+                            <button onclick="event.stopPropagation(); window.openDel('${r.id}')" class="text-slate-200 hover:text-red-500" title="刪除"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            `}
+                        </div>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+            const es = document.getElementById('emptyState');
+            if (es) es.className = (filtered.length === 0) ? 'p-16 text-center text-slate-300 italic text-xs' : 'hidden';
+            refreshIcons();
+        }
+
+        window.openModal = (id) => document.getElementById(id).classList.add('active');
+        window.closeModal = (id) => document.getElementById(id).classList.remove('active');
+        window.applyFilter = (idx, val) => { filters[idx] = val.toLowerCase(); window.renderTable(); };
+        
+        window.switchActionTab = (tab) => {
+            const tabLoan = document.getElementById('tabLoan');
+            const tabReturn = document.getElementById('tabReturn');
+            
+            tabLoan.classList.toggle('active', tab === 'loan');
+            tabReturn.classList.toggle('active', tab === 'return');
+            document.getElementById('paneLoan').classList.toggle('active', tab === 'loan');
+            document.getElementById('paneReturn').classList.toggle('active', tab === 'return');
+            
+            if (window.viewType === 'inventory') {
+                tabReturn.classList.add('hidden');
+                // --- 修正：雙擊辦理借出 vs 新增入庫樣鞋 ---
+                tabLoan.innerText = currentRecord ? '辦理再次借出' : '新增入庫樣鞋';
+            } else {
+                tabReturn.classList.remove('hidden');
+                tabLoan.innerText = currentRecord ? '辦理再次借出' : '新增借出紀錄';
+            }
+        };
+
+        window.openActionModal = function(record = null) {
+            currentRecord = record;
+            const displayStyle = document.getElementById('displayStyle');
+            const borrowerSection = document.getElementById('a_borrower_section');
+            const submitBtn = document.getElementById('a_submit_btn');
+            
+            if (record) {
+                displayStyle.innerText = record.style || '';
+                document.getElementById('displayBrand').innerText = record.brand || '-';
+                document.getElementById('a_brand').value = record.brand || '';
+                document.getElementById('a_style').value = record.style || '';
+                document.getElementById('a_color').value = record.color || '';
+                document.getElementById('a_season').value = record.season || '';
+                document.getElementById('a_dept').value = ''; 
+                document.getElementById('a_borrower').value = ''; 
+                document.getElementById('r_display_borrower').innerText = `${record.dept ? record.dept + '-' : ''}${record.borrower}`;
+                document.getElementById('r_display_date').innerText = record.loanDate || '-';
+                
+                const isRet = record.returnDate && record.returnDate.trim() !== '';
+                document.getElementById('returnStatusNotice').classList.toggle('hidden', !isRet);
+                document.getElementById('submitReturnBtn').classList.toggle('hidden', isRet);
+                
+                // 再次借出：顯示部門與姓名，按鈕設為藍色「確認借出」
+                borrowerSection.classList.remove('hidden');
+                document.getElementById('a_borrower').required = true;
+                submitBtn.innerText = '確認辦理借出 (新增一筆流水)';
+                submitBtn.className = "col-span-2 bg-indigo-600 text-white py-3.5 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all uppercase tracking-widest";
+                
+                window.switchActionTab(isRet ? 'loan' : 'return');
+            } else {
+                document.getElementById('addForm').reset();
+                document.getElementById('displayBrand').innerText = '-';
+                displayStyle.innerText = window.viewType === 'inventory' ? '新增樣鞋入庫' : '新增借出紀錄';
+                window.switchActionTab('loan');
+                
+                if (window.viewType === 'inventory') {
+                    // --- 核心改動：在庫分頁新增，隱藏部門與人員，按鈕設為綠色「確認入庫」 ---
+                    borrowerSection.classList.add('hidden'); 
+                    document.getElementById('a_borrower').required = false;
+                    submitBtn.innerText = '確認入庫上架';
+                    submitBtn.className = "col-span-2 bg-emerald-600 text-white py-3.5 rounded-xl font-black shadow-lg hover:bg-emerald-700 transition-all uppercase tracking-widest";
+                } else {
+                    // 流水帳新增，顯示部門與人員
+                    borrowerSection.classList.remove('hidden'); 
+                    document.getElementById('a_borrower').required = true;
+                    submitBtn.innerText = '確認直接借出 (寫入流水)';
+                    submitBtn.className = "col-span-2 bg-indigo-600 text-white py-3.5 rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all uppercase tracking-widest";
+                }
+            }
+            window.openModal('actionModal');
+            refreshIcons();
+        };
+
+        window.adjustInventory = async (brand, style, color, season, currentTotal) => {
+            const newTotalStr = prompt(`【庫存盤點與校正】\n\n型號：${style}\n\n系統目前計算的總量為：${currentTotal}\n請輸入這雙鞋「現在實際的總數量」：`, currentTotal);
+            if (newTotalStr === null || newTotalStr.trim() === '') return;
+            const newTotal = parseInt(newTotalStr);
+            if (isNaN(newTotal) || newTotal < 0) {
+                alert("請輸入有效的正整數或 0！");
+                return;
+            }
+            if (newTotal === currentTotal) return;
+
+            const diff = newTotal - currentTotal;
+            const allItems = window.dataStore[window.currentMode] || [];
+            const maxStt = allItems.reduce((m, r) => Math.max(m, parseInt(r.stt) || 0), 0);
+
+            await window.dbActions.add({
+                stt: maxStt + 1,
+                brand: brand,
+                style: style,
+                color: color,
+                season: season,
+                qty: diff, 
+                loanDate: '',
+                expected: '',
+                dept: '',
+                borrower: '', 
+                returnDate: getMD(), 
+                returnedBy: '系統校正',
+                confirmerReturn: '庫存盤點'
+            });
+            alert(`已自動產生一筆數量為 ${diff > 0 ? '+'+diff : diff} 的「庫存盤點」紀錄，總量已更新！`);
+        };
+
+        window.openBulkReturnModal = () => {
+            const list = document.getElementById('bulkReturnList');
+            list.innerHTML = '';
+            const all = window.dataStore[window.currentMode] || [];
+            all.filter(i => window.selectedIds.has(i.id)).forEach(i => {
+                const div = document.createElement('div');
+                div.className = "flex justify-between bg-slate-50 p-2 rounded border border-slate-100 text-xs mb-1";
+                div.innerHTML = `<span><strong>${i.style}</strong></span><span>${i.borrower}</span>`;
+                list.appendChild(div);
+            });
+            document.getElementById('bulk_r_date').value = getMD();
+            window.openModal('bulkReturnModal');
+        };
+
+        window.handleBulkReturnSubmit = async (e) => {
+            e.preventDefault();
+            const date = document.getElementById('bulk_r_date').value;
+            const conf = document.getElementById('bulk_r_conf').value;
+            for (const id of window.selectedIds) {
+                const record = window.dataStore[window.currentMode].find(i => i.id === id);
+                if (record) await window.dbActions.update(id, { returnDate: date, returnedBy: record.borrower, confirmerReturn: conf });
+            }
+            window.selectedIds.clear();
+            window.closeModal('bulkReturnModal');
+        };
+
+        document.getElementById('addForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const allItems = window.dataStore[window.currentMode] || [];
+            const maxStt = allItems.reduce((m, r) => Math.max(m, parseInt(r.stt) || 0), 0);
+            
+            const borrower = document.getElementById('a_borrower').value;
+            // 純入庫條件：沒填人名 且 (是在庫視圖點新增 OR 從庫存加號按但沒填人)
+            const isInitialIn = !borrower || borrower.trim() === '';
+            const qty = parseFloat(document.getElementById('a_qty').value) || 1;
+
+            await window.dbActions.add({
+                stt: maxStt + 1, 
+                brand: document.getElementById('a_brand').value, 
+                style: document.getElementById('a_style').value,
+                color: document.getElementById('a_color').value, 
+                season: document.getElementById('a_season').value,
+                qty: qty,
+                loanDate: isInitialIn ? '' : getMD(), 
+                expected: isInitialIn ? '' : 2, 
+                dept: document.getElementById('a_dept').value,
+                borrower: borrower || '', 
+                returnDate: isInitialIn ? getMD() : '', 
+                returnedBy: isInitialIn ? '系統初始' : '', 
+                confirmerReturn: isInitialIn ? '在庫備用' : ''
+            });
+            window.closeModal('actionModal'); window.showToast(window.t('toast_return_success')); window.showToast(window.t('toast_add_success'));
+        };
+
+        document.getElementById('retForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!currentRecord) return;
+            await window.dbActions.update(currentRecord.id, {
+                returnDate: document.getElementById('r_date').value,
+                returnedBy: currentRecord.borrower,
+                confirmerReturn: document.getElementById('r_conf').value
+            });
+            window.closeModal('actionModal');
+        };
+
+        window.openDel = (id) => {
+            document.getElementById('confirmDeleteBtn').onclick = async () => { await window.dbActions.delete(id); window.closeModal('deleteModal'); window.showToast(window.t('toast_del_success')); };
+            window.openModal('deleteModal');
+        };
+
+        window.handleImport = async (e) => {
+            if (!e.target || !e.target.files || e.target.files.length === 0) return;
+            const file = e.target.files[0];
+            
+            const btn = document.querySelector('#importModal button');
+            const originalBtnText = btn.innerText;
+            btn.innerText = '匯入處理中，請稍候...';
+            btn.disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    if (!window.isAuthReady) {
+                        alert('無法匯入：尚未連線或未開啟單機模式 (Auth Not Ready)');
+                        return;
+                    }
+                    const lines = evt.target.result.split(/\r?\n/).filter(l => l.trim());
+                    let count = 0;
+                    for (let l of lines.slice(1)) {
+                        const c = l.split(',').map(s => s.replace(/"/g, '').trim());
+                        if (c.length < 5) continue;
+                        
+                        let stt=c[0], brand=c[1], style=c[2], color=c[3], season=c[4];
+                        let qty=1, loanDate='', expected='', dept='', borrower='', retDate='', retBy='', conf='';
+                        
+                        if (c.length >= 13 && !isNaN(parseFloat(c[5]))) { // New format with Qty
+                            qty = parseFloat(c[5]) || 1;
+                            loanDate=c[6]; expected=c[7]; dept=c[8]; borrower=c[9]; retDate=c[10]; retBy=c[11]; conf=c[12];
+                        } else { // Old format
+                            qty = 1;
+                            loanDate=c[5]; expected=c[6]; dept=c[7]; borrower=c[8]; retDate=c[9]; retBy=c[10]; conf=c[11];
+                        }
+
+                        await window.dbActions.add({
+                            stt: stt || '', brand: brand || '', style: style || '', color: color || '', season: season || '',
+                            qty: qty,
+                            loanDate: loanDate || '', expected: expected || '', dept: dept || '', borrower: borrower || '', 
+                            returnDate: retDate || '', returnedBy: retBy || '', confirmerReturn: conf || ''
+                        });
+                        count++;
+                    }
+                    window.showToast(window.t('toast_import_success', {n: count}));
+                    window.closeModal('importModal');
+                } catch (err) {
+                    console.error("匯入失敗:", err);
+                    alert("匯入過程中發生錯誤：\n" + err.message);
+                } finally {
+                    btn.innerText = originalBtnText;
+                    btn.disabled = false;
+                    e.target.value = ''; // 清除選取狀態
+                }
+            };
+            reader.readAsText(file, document.getElementById('encoding').value);
+        };
+
+        window.exportToCSV = () => {
+            const h = "STT,Brand,Style #,Color,Season,Qty,Loan Date,Expected,Dept,Borrower,Return Date,Returned By,Confirmer";
+            const items = window.dataStore[window.currentMode] || [];
+            const r = items.map(i => [i.stt, i.brand, i.style, i.color, i.season, (i.qty||1), i.loanDate, i.expected, i.dept, i.borrower, i.returnDate, i.returnedBy, i.confirmerReturn].join(','));
+            const blob = new Blob(["\ufeff" + h + "\n" + r.join("\n")], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `${window.currentMode}_ledger.csv`); link.click();
+        };
+
+        function getMD() { const d = new Date(); return `${d.getMonth() + 1}/${d.getDate()}`; }
+        initApp();
+    </script>
+
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        .filter-select, .filter-input { width: 100%; font-size: 11px; padding: 4px 2px; border: 1px solid #cbd5e1; border-radius: 4px; outline: none; }
+        .table-wrapper { height: calc(100vh - 240px); overflow: auto; border-radius: 8px; border: 1px solid #e2e8f0; }
+        table { border-collapse: separate; border-spacing: 0; min-width: 1450px; width: 100%; }
+        thead th { position: sticky; top: 0; z-index: 20; border-bottom: 2px solid #e2e8f0; }
+        .filter-row th { position: sticky; top: 37px; z-index: 19; border-bottom: 1px solid #e2e8f0; }
+        .tab-btn { padding: 12px 0; font-weight: 800; font-size: 14px; flex: 1; text-align: center; border-bottom: 2px solid transparent; color: #94a3b8; transition: all 0.3s; cursor: pointer; }
+        .tab-btn.active { border-bottom-color: #2563eb; color: #2563eb; background: #eff6ff; }
+        .action-pane { display: none; padding: 24px; } .action-pane.active { display: block; }
+        tr.lent-active { background-color: rgba(255, 247, 237, 0.4); }
+        
+        body.mode-inventory .ledger-col { display: none !important; }
+        
+        /* Frozen Columns */
+        thead th:nth-child(1), tbody td:nth-child(1) { position: sticky; left: 0; }
+        thead th:nth-child(2), tbody td:nth-child(2) { position: sticky; left: 40px; }
+        thead th:nth-child(3), tbody td:nth-child(3) { position: sticky; left: 90px; }
+        thead th:nth-child(4), tbody td:nth-child(4) { position: sticky; left: 175px; }
+        thead th:nth-child(5), tbody td:nth-child(5) { position: sticky; left: 275px; border-right: 2px solid #e2e8f0; }
+        
+        /* Backgrounds */
+        tbody td { background: inherit; }
+        thead th { background: rgba(248, 250, 252, 0.85) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        tr:hover td { background: #eff6ff !important; }
+        tr.lent-active td { background: rgba(255, 247, 237, 1) !important; }
+        tr.bg-red-50 td { background: #fef2f2 !important; }
+
+        /* Z-Index Hierarchy */
+        tbody td:nth-child(-n+5) { z-index: 11; }
+        thead th:nth-child(-n+5) { z-index: 21; }
+        .filter-row th:nth-child(-n+5) { z-index: 20; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 p-2 text-sm font-medium">
+    <div class="max-w-full mx-auto">
+        <!-- 頂層分頁 -->
+        <div class="flex justify-between items-center mb-3">
+            <div class="flex gap-2 p-1 bg-slate-200 rounded-xl">
+                <button id="tabConfirm" onclick="switchMode('confirm')" class="px-4 py-2 rounded-lg font-bold text-sm bg-indigo-600 text-white shadow-md transition-all" data-i18n="tab_confirm">確認鞋 (Confirm)</button>
+                <button id="tabFitting" onclick="switchMode('fitting')" class="px-4 py-2 rounded-lg font-bold text-sm bg-slate-200 text-slate-500 transition-all" data-i18n="tab_fitting">FITTING鞋</button>
+            </div>
+            <div id="statPanel" class="flex gap-4 text-[10px] font-black bg-white px-4 py-2 rounded-xl border shadow-sm uppercase tracking-tighter">
+                <span id="syncIndicator" class="flex items-center gap-1 text-slate-400 transition-colors"><i data-lucide="cloud-check" class="w-3 h-3"></i> <span id="syncText" data-i18n="msg_syncing">正在連線...</span></span>
+            </div>
+        </div>
+
+        
+        <!-- Dashboard -->
+        <div class="grid grid-cols-3 gap-4 mb-4">
+            <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center justify-between">
+                <div class="text-slate-400 text-[10px] font-black uppercase tracking-widest" data-i18n="dash_total">總在庫數量</div>
+                <div class="text-2xl font-black text-emerald-600" id="dashValTotal">0</div>
+            </div>
+            <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center justify-between">
+                <div class="text-slate-400 text-[10px] font-black uppercase tracking-widest" data-i18n="dash_lent">目前外借中</div>
+                <div class="text-2xl font-black text-indigo-600" id="dashValLent">0</div>
+            </div>
+            <div class="bg-white border rounded-xl p-4 shadow-sm flex items-center justify-between">
+                <div class="text-slate-400 text-[10px] font-black uppercase tracking-widest" data-i18n="dash_overdue">逾期未還</div>
+                <div class="text-2xl font-black text-red-600" id="dashValOverdue">0</div>
+            </div>
+        </div>
+        
+        <!-- 檢視模式 -->
+        <div class="flex gap-2 px-2">
+            <button id="viewLedger" onclick="switchView('ledger')" class="px-6 py-2 rounded-t-lg font-black text-sm bg-white border-b-2 border-indigo-600 text-indigo-600 transition-all" data-i18n="view_ledger">借還流水帳 (完整歷史)</button>
+            <button id="viewInventory" onclick="switchView('inventory')" class="px-6 py-2 rounded-t-lg font-bold text-sm bg-slate-100 text-slate-400 transition-all flex items-center gap-2">
+                <i data-lucide="package" class="w-4 h-4"></i> <span data-i18n="view_inventory">樣鞋房在庫現況 (現有實體)</span>
+            </button>
+        </div>
+        
+        <!-- 操作列 -->
+        <div class="bg-white p-3 rounded-b-xl rounded-tr-xl shadow-sm border mb-4 flex justify-between items-center">
+            <div class="flex items-center gap-4"><h1 id="titleDisplay" class="text-base font-black flex items-center gap-2 text-slate-700 uppercase tracking-tight"></h1></div>
+            <div class="flex items-center gap-2">
+                <button id="bulkReturnBtn" onclick="openBulkReturnModal()" class="hidden bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-xs font-black border border-indigo-200 hover:bg-indigo-200 transition-all">批量歸還 (0)</button>
+                <div class="flex gap-3 border-r pr-4 border-slate-200 text-[11px] font-bold text-slate-400 uppercase tracking-tighter">
+                    <button onclick="exportToCSV()" class="hover:text-emerald-600 transition-colors" data-i18n="btn_export">匯出報表</button>
+                    <button onclick="openModal('importModal')" class="hover:text-indigo-600 transition-colors" data-i18n="btn_import">匯入資料</button>
+                </div>
+                <button onclick="openActionModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg text-xs font-bold hover:bg-indigo-500 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all duration-300">
+                    <i data-lucide="plus" class="inline w-4 h-4 mr-1"></i> <span id="addBtnText">新增借出紀錄</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 表格區 -->
+        <div class="table-wrapper bg-white shadow-inner">
+            <table>
+                <thead>
+                    <tr class="text-[11px] font-black text-slate-500 uppercase tracking-tighter">
+                        <th id="selectHeader" class="p-2 w-[40px] text-center"><input type="checkbox" onchange="toggleSelectAll(this.checked)"></th>
+                        <th class="p-2 w-[50px] ledger-col">STT</th><th class="p-2 w-[85px]" data-i18n="th_status">當前狀態</th><th class="p-2 w-[100px]" data-i18n="th_brand">Brand</th><th class="p-2 w-[150px]" data-i18n="th_style">Style #</th><th class="p-2 w-[100px]" data-i18n="th_color">Color</th><th class="p-2 w-[80px]" data-i18n="th_season">Season</th><th class="p-2 w-[85px] ledger-col" data-i18n="th_loan_date">借出日期</th><th class="p-2 w-[60px] ledger-col" data-i18n="th_qty_days">數量/天數</th><th class="p-2 w-[150px] ledger-col" data-i18n="th_borrower">借用人</th><th class="p-2 w-[100px] ledger-col" data-i18n="th_return_date">歸還日期</th><th class="p-2 w-[120px] ledger-col" data-i18n="th_signature">簽收紀錄</th><th class="p-2 w-[100px] text-center" data-i18n="th_action">操作</th>
+                    </tr>
+                    <tr class="filter-row">
+                        <th id="filterSelect"></th><th class="ledger-col"></th>
+                        <th><select class="filter-select" onchange="applyFilter(1, this.value)"><option value="" data-i18n="filter_all">全部</option><option value="外借中" data-i18n="filter_lent">外借中</option><option value="已結案" data-i18n="filter_closed">已結案</option></select></th>
+                        <th><select id="f_brand" class="filter-select" onchange="applyFilter(2, this.value)"></select></th>
+                        <th><input type="text" class="filter-input" oninput="applyFilter(3, this.value)" placeholder="搜尋型號" data-i18n="ph_search_style"></th>
+                        <th><input type="text" class="filter-input" oninput="applyFilter(4, this.value)" placeholder="搜尋顏色" data-i18n="ph_search_color"></th>
+                        <th><select id="f_season" class="filter-select" onchange="applyFilter(5, this.value)"></select></th>
+                        <th class="ledger-col"></th><th class="ledger-col"></th>
+                        <th class="ledger-col"><input type="text" class="filter-input" oninput="applyFilter(8, this.value)" placeholder="搜尋借用人" data-i18n="ph_search_borrower"></th>
+                        <th class="ledger-col"></th><th class="ledger-col"></th><th></th>
+                    </tr>
+                </thead>
+                <tbody id="ledgerBody" class="text-xs divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+            
+            <div id="emptyState" class="p-20 flex flex-col items-center justify-center text-slate-300 gap-4 hidden animate-in fade-in zoom-in duration-500">
+                <i data-lucide="package-open" class="w-20 h-20 opacity-30 text-indigo-500"></i>
+                <p class="font-black text-lg tracking-widest uppercase opacity-60" data-i18n="empty_state">目前此視圖下尚無資料</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量彈窗 -->
+    
+    <!-- Datalists for Autocomplete -->
+    <datalist id="brandList"></datalist>
+    <datalist id="styleList"></datalist>
+    <div id="bulkReturnModal"  class="modal fixed inset-0 bg-black/60 z-50 items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl">
+            <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-black text-slate-800" data-i18n="modal_bulk">批量歸還簽收</h3><button onclick="closeModal('bulkReturnModal')" class="text-slate-400 hover:text-slate-600 transition-colors"><i data-lucide="x" class="w-6 h-6"></i></button></div>
+            <div id="bulkReturnList" class="max-h-40 overflow-y-auto mb-6"></div>
+            <form onsubmit="handleBulkReturnSubmit(event)" class="space-y-4">
+                <input type="text" id="bulk_r_date" placeholder="實際歸還日 (M/D)" data-i18n="ph_r_date" class="w-full border p-3 rounded-xl font-bold bg-slate-50 outline-none">
+                <input type="text" id="bulk_r_conf" value="助理已收" class="w-full border p-3 rounded-xl font-bold bg-slate-50 outline-none">
+                <button type="submit" class="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-emerald-700 transition-all" data-i18n="btn_bulk_confirm">確認批量收回結案</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 操作彈窗 -->
+    <div id="actionModal" class="modal fixed inset-0 bg-black/60 z-50 items-center justify-center p-4">
+        <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div class="flex border-b border-slate-100 bg-slate-50/50">
+                <button id="tabLoan" onclick="switchActionTab('loan')" class="tab-btn active" data-i18n="form_tab_loan">再次借出 / 新增</button>
+                <button id="tabReturn" onclick="switchActionTab('return')" class="tab-btn" data-i18n="form_tab_return">歸還簽收</button>
+                <button onclick="closeModal('actionModal')" class="px-4 text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="px-6 py-3 bg-indigo-50/50 border-b border-indigo-100 text-xs font-bold flex gap-4 uppercase tracking-tighter"><span id="displayBrand" class="text-indigo-800"></span><span id="displayStyle" class="text-indigo-600 font-mono"></span></div>
+            
+            <div id="paneLoan" class="action-pane active">
+                <form id="addForm" class="grid grid-cols-2 gap-4 text-xs font-semibold text-slate-600">
+                    <input type="text" id="a_brand" placeholder="品牌 Brand" data-i18n="ph_brand" class="border p-2.5 rounded" required>
+                    <input type="text" id="a_style" placeholder="型號 Style #" data-i18n="ph_style" class="border p-2.5 rounded" required>
+                    <input type="text" id="a_color" placeholder="顏色 Colorway" data-i18n="ph_color" class="border p-2.5 rounded">
+                    <input type="text" id="a_season" placeholder="季節 Season" data-i18n="ph_season" class="border p-2.5 rounded" value="FA25">
+                    
+                    <div id="a_qty_section" class="col-span-2">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 ml-1" data-i18n="lbl_qty">操作數量 (雙)</label>
+                            <input type="number" id="a_qty" class="w-full border p-2.5 rounded bg-amber-50 focus:ring-2 focus:ring-amber-200 outline-none font-bold text-amber-700" value="1" min="0.5" step="0.5" required>
+                        </div>
+                    </div>
+                    
+                    <div id="a_borrower_section" class="col-span-2 space-y-1">
+                        <label id="a_borrower_label" class="text-[10px] font-black text-slate-400 ml-1" data-i18n="lbl_borrower">借用人 / 單位</label>
+                        <input type="text" id="a_borrower" placeholder="請輸入借用人姓名 (如: 針車課 王大明)" data-i18n="ph_borrower" class="w-full border-2 border-indigo-100 p-2.5 rounded focus:border-indigo-500 outline-none">
+                        <input type="hidden" id="a_dept" value="">
+                    </div>
+
+                    <button type="submit" id="a_submit_btn" class="col-span-2 bg-indigo-600 text-white py-3.5 rounded-xl font-black shadow-lg hover:shadow-xl hover:bg-indigo-500 hover:-translate-y-0.5 transition-all tracking-widest uppercase duration-300">確認</button>
+                </form>
+            </div>
+            
+            <div id="paneReturn" class="action-pane">
+                <div id="returnStatusNotice" class="hidden p-3 bg-emerald-50 text-emerald-700 mb-4 rounded-lg text-center font-bold text-xs border border-emerald-100 italic" data-i18n="msg_returned">該筆歷史紀錄已歸還完畢</div>
+                <form id="retForm" class="space-y-4 font-semibold text-xs text-slate-600">
+                    <div class="bg-slate-50 p-4 rounded-xl flex justify-between border border-slate-100"><span><span data-i18n="lbl_r_borrower">借用人:</span> <strong id="r_display_borrower"></strong></span><span><span data-i18n="lbl_r_date">借出日:</span> <strong id="r_display_date"></strong></span></div>
+                    <input type="text" id="r_date" class="w-full border p-3 rounded-xl font-black outline-none shadow-inner" placeholder="實際歸還日期 (M/D)" data-i18n="ph_r_date">
+                    <input type="text" id="r_conf" class="w-full border p-3 rounded-xl font-black outline-none" value="助理已收">
+                    <button type="submit" id="submitReturnBtn" class="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black shadow-lg hover:shadow-xl hover:bg-emerald-500 hover:-translate-y-0.5 transition-all tracking-widest uppercase duration-300" data-i18n="btn_confirm_return">確認簽收結案</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 刪除確認 -->
+    <div id="deleteModal" class="modal fixed inset-0 bg-black/70 z-50 items-center justify-center p-4">
+        <div class="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl text-center">
+            <div class="flex justify-center mb-4 text-red-500"><i data-lucide="alert-triangle" class="w-12 h-12"></i></div>
+            <h2 class="font-bold text-lg mb-6 text-red-600 tracking-tighter" data-i18n="title_confirm_del">確定要刪除記錄嗎？</h2>
+            <div class="flex gap-3">
+                <button onclick="closeModal('deleteModal')" class="flex-1 py-2.5 bg-slate-100 text-slate-500 rounded-lg font-bold text-xs hover:bg-slate-200 transition-all" data-i18n="btn_cancel">取消</button>
+                <button id="confirmDeleteBtn" class="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-bold text-xs shadow-lg active:scale-95 transition-all" data-i18n="btn_del">確定刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯入彈窗 -->
+    <div id="importModal" class="modal fixed inset-0 bg-black/60 z-50 items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-xl p-6 shadow-2xl font-bold">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-slate-800 tracking-tighter uppercase font-black" data-i18n="modal_import">匯入 CSV 歷史資料</h2><button onclick="closeModal('importModal')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button></div>
+            <select id="encoding" class="w-full mb-4 border p-2.5 rounded text-xs outline-none"><option value="UTF-8">UTF-8</option><option value="Big5">Big5 (Excel)</option></select>
+            <input type="file" id="fileIn" class="hidden" accept=".csv" onchange="handleImport(event)">
+            <button onclick="document.getElementById('fileIn').click()" class="w-full py-10 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold hover:bg-slate-50 text-xs transition-all uppercase tracking-widest text-center" data-i18n="btn_import_file">點擊選擇檔案</button>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+</body>
+</html>
